@@ -1,0 +1,140 @@
+;打开设备管理器 DevMgmt.msc
+;HKU 表示HKEY_USER
+;HKLM表示HKEY_LOCAL_MACHINE
+;HKCU表示HKEY_CURRENT_USER
+;HKCR表示HKEY_CLASSES_ROOT
+;HKCC表示HKEY_CURRENT_CONFIG 
+
+;(1)在DDInstall section中,HKR缩写表示的是设备的software key(软件子键),具体注册表键值是:
+;HKLM/SYSTEM/CurrentControlSet/Control/Class/%ClassGuid%/%DeviceIndex%
+;其中ClassGuid是设备类的GUID,DeviceIndex是设备序号,如果PC中有多于一个的同类设备,序号会顺序排列下去0000、0001、0002……
+
+;(2)在DDInstall.HW section中,HKR缩写表示的是设备的hardware key(硬件子键),具体注册表键值是:
+;HKLM/SYSTEM/CurrentControlSet/Enum/enumerator/deviceID
+;其中enumerator是设备类别,deviceID是设备的id号
+
+;(3)在DDInstall.Services section中,HKR缩写表示的是Services key(服务子键),具体注册表键值是:
+;HKLM/SYSTEM/CurrentControlSet/Service
+
+;(4)在DDInstall.Interfaces section中,一般在用AddInterface Directive来进行和注册表相关的操作时会用的HKR,
+;这时HKR缩写表示HKLM/SYSTEM/CurrentControlSet/Control/DeviceClasses/%InterfaceClassGUID%/ branch,
+;其中InterfaceClassGUID由AddInterface Directive的第一个参数指定,branch由AddInterface Directive的第二个参数指定。
+
+;(5)在ClassInstall32 section中, 表示HKLM/SYSTEM/CurrentControlSet/Control/Class/%ClassGUID%,其中ClassGuid是设备类的GUID。 
+ 
+
+;类键   HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\
+;接口键 HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\DeviceClasses\GUID
+;软件键 HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\GUID\实例ID
+;硬件键 HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\总线\设备ID\实例ID
+;       比如 : HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Enum\USB\设备ID\实例ID
+
+;可以参考深入浅出Windows驱动开发 438页
+;注册表的值类型
+;REG_SZ         = 0x00000000
+;REG_BINARY     = 0x00000001
+;REG_MULTI_SZ   = 0x00010000
+;REG_EXPAND_SZ  = 0x00020000
+;REG_DWORD      = 0x00010001
+
+;注册表操作标志
+;为0时候表示更改,创建
+;0x2 只能新疆
+;0x4 删除
+;0x8 append, 不存在则新建
+
+;注册表操作命令
+;根键,[子健],[键值名],[flags],[键值]
+;0x0 
+
+;############################################################################################
+;版本域
+;############################################################################################
+[Version]
+;"$Chicago$"表示win98之后, $Windows NT$表示win2000/xp之后
+Signature="$Windows NT$"
+;驱动版本, 格式是 月/日/年[,w.x.y.z]
+DriverVer = 09/14/2020,18.18.53.108
+;设备类名称, 所有的设备类都保存在  HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\
+Class=Keyboard
+;设备类的GUID,旧式NT驱动是通过软链接(DOS符号), WDM之后都通过GUID来打开设备
+;创建GUID的方法在vs主界面->工具->创建GUID
+ClassGUID={4D36E96B-E325-11CE-BFC1-08002BE10318}
+;作者
+Provider=%ProviderName%
+;数字签名文件
+CatalogFile=KmdfSamples.cat
+
+;############################################################################################
+;CopyFiles指令把由 '(N个)源磁盘' 中的 '(N个)源文件' 组成的 '文件列表' 拷贝到指定 '目的地'
+;若没有CopyFiles指令, 源磁盘域和源文件域可以不存在
+;############################################################################################
+;源磁盘域
+;ID = 磁盘描述[,[tag_or_cab文件], [unused], [路径] [,flags]] [,tag文件]
+;tag文件是Windows xp以后才使用
+[SourceDisksNames]
+1 = %DiskId1%
+
+;源文件域
+;文件名 = 磁盘号[,[路径] [,大小]]
+[SourceDisksFiles]
+kbfiltr.sys = 1
+
+;目的域
+;目录ID
+;01 当前的安装文件所在的目录
+;10 Windows目录 %SystemRoot%
+;11 %SystemRoot%\system32
+;12 %SystemRoot%\system32\drivers
+;17 %SystemRoot%\Inf
+;24 系统盘目录, 不一定是C:\盘
+;30 启动盘目录
+;-1 绝对路径
+;16406 All Users\Start Menu
+;16407 All Users\Start Menu\Programs
+[DestinationDirs]
+;默认目标 
+;DefaultDestDir = 目录ID [子目录]
+DefaultDestDir   = 12
+
+;############################################################################################
+;产品域 设备描述 = 设备安装域(DDInstall),[硬件ID] 
+;NTamd64表示兼容amd64位cpu
+;############################################################################################
+[Manufacturer]
+;这个$ARCH$是一个变量, 在amd64平台下值为amd64, Standard,NT$ARCH$  == Standard.NTamd64
+%MfgName% = Standard,NT$ARCH$
+
+;安装域
+;若是在32位上安装
+;[Standard.NTx86]
+;注册表路径为HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\Class\GUID\实例ID
+[Standard.NTamd64]
+%kbfiltr.DeviceDesc% = kbfiltr,*PNP0303
+
+;服务安装域
+;AddService=服务名, [flags], 服务安装子域 [, 事件...]
+[kbfiltr.NT.Services]
+AddService = kbfiltr,  , kbfiltr_Service_Inst 
+Include=keyboard.inf
+Needs=STANDARD_Inst.Services
+
+;[服务安装子域]
+[kbfiltr_Service_Inst]
+;[Description=描述字符串]
+;[StartName=驱动对象名]
+DisplayName    = %kbfiltr.SvcDesc%
+ServiceType    = 1                  ; SERVICE_KERNEL_DRIVER
+StartType      = 3                  ; SERVICE_DEMAND_START
+ErrorControl   = 0                  ; SERVICE_ERROR_IGNORE
+ServiceBinary  = %12%\kbfiltr.sys
+
+;[硬件安装子域]
+[kbfiltr.NT.HW] 
+AddReg = kbfiltr.HW.AddReg 
+Include=keyboard.inf
+Needs=STANDARD_Inst.HW
+
+[kbfiltr.HW.AddReg]
+;表示安装为kbfiltr的上层过滤驱动
+HKR,,"UpperFilters",0x00010000,"kbfiltr"
